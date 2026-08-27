@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Break Bell</string>
+    <string name="widget_description">Start or end your Break Bell workday</string>
+    <string name="notification_channel_name">Break alarms</string>
+    <string name="notification_channel_description">Persistent alarms that tell you when it is time to step away</string>
+    <string name="widget_brand">BREAK BELL</string>
+    <string name="widget_ready">Ready to start</string>
+    <string name="widget_start">START</string>
+</resources>
