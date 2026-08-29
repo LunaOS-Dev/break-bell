@@ -82,6 +82,8 @@ import com.breakbell.app.bridge.BridgeConnectionResult
 import com.breakbell.app.data.AppState
 import com.breakbell.app.data.BlockPlan
 import com.breakbell.app.data.BreakBellStore
+import com.breakbell.app.data.BreakRoastContext
+import com.breakbell.app.data.BreakRoasts
 import com.breakbell.app.data.BridgeConfig
 import com.breakbell.app.data.Phase
 import com.breakbell.app.data.WorkdayRecord
@@ -394,7 +396,7 @@ private fun ActiveWorkday(
             Text(
                 when (phase) {
                     Phase.WORK -> "${state.currentBlock.displayName.uppercase(Locale.US)} · FOCUS"
-                    Phase.BREAK -> "ON BREAK"
+                    Phase.BREAK -> "BREAK TIMER RUNNING"
                     Phase.WAITING_FOR_BREAK -> "BREAK OVERDUE"
                     Phase.IDLE -> "READY"
                 },
@@ -419,17 +421,27 @@ private fun ActiveWorkday(
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Paper, contentColor = Signal),
             ) {
-                Text("I'M ON BREAK", fontWeight = FontWeight.Black, fontSize = 17.sp)
+                Text("I'M STEPPING AWAY", fontWeight = FontWeight.Black, fontSize = 17.sp)
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                "Rings for 10 seconds every minute until acknowledged.",
+                BreakRoasts.message(
+                    BreakRoastContext.BREAK_DUE,
+                    now - state.phaseStartedAt,
+                ) + " Tapping starts the timer; leaving the keyboard is the break.",
                 color = contentColor.copy(alpha = .7f),
                 textAlign = TextAlign.Center,
             )
         } else {
             Text(
-                if (state.phase == Phase.WORK) "Break: ${state.currentBlock.breakMinutes} min" else "Next block starts automatically",
+                if (state.phase == Phase.WORK) {
+                    "Break: ${state.currentBlock.breakMinutes} min"
+                } else {
+                    BreakRoasts.message(
+                        BreakRoastContext.BREAK_CLAIMED,
+                        now - state.phaseStartedAt,
+                    )
+                },
                 color = contentColor.copy(alpha = .7f),
                 fontSize = 16.sp,
             )
@@ -441,7 +453,7 @@ private fun ActiveWorkday(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Metric("STARTED", formatTime(state.workdayStartedAt), contentColor)
-            Metric("BREAKS", state.completedBreaks.toString(), contentColor, Alignment.End)
+            Metric("BREAK TIMERS", state.completedBreaks.toString(), contentColor, Alignment.End)
         }
     }
 }
@@ -640,7 +652,8 @@ private fun AgentBridgeSettings(
         SectionLabel("AGENT BRIDGE · OPTIONAL")
         Spacer(Modifier.height(7.dp))
         Text(
-            "Pair your computer so agents know when human maintenance is due. Only timer phase is sent.",
+            "Pair your computer so agents can distinguish a tapped button from an actual break. " +
+                "Only timer phase is sent; Windows checks time since the last keyboard or mouse input.",
             color = Muted,
             fontSize = 14.sp,
             lineHeight = 20.sp,
@@ -707,7 +720,7 @@ private fun HistoryRow(record: WorkdayRecord) {
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(formatMinutes(durationMinutes), color = Ink, fontWeight = FontWeight.Bold)
-            Text("${record.completedBreaks} breaks", color = Muted, fontSize = 13.sp)
+            Text("${record.completedBreaks} break timers", color = Muted, fontSize = 13.sp)
         }
     }
 }
