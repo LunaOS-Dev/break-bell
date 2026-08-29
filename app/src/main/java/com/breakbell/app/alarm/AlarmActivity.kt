@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.breakbell.app.data.BreakBellStore
+import com.breakbell.app.data.BreakRoastContext
+import com.breakbell.app.data.BreakRoasts
 import com.breakbell.app.data.Phase
 import com.breakbell.app.ui.theme.BreakBellTheme
 
@@ -47,11 +49,17 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun showAlarm() {
-        val isWaiting = BreakBellStore(this).readState().phase == Phase.WAITING_FOR_BREAK
+        val state = BreakBellStore(this).readState()
+        val isWaiting = state.phase == Phase.WAITING_FOR_BREAK
+        val roast = BreakRoasts.message(
+            BreakRoastContext.BREAK_DUE,
+            System.currentTimeMillis() - state.phaseStartedAt,
+        )
         setContent {
             BreakBellTheme {
                 AlarmScreen(
                     isBreakDue = isWaiting,
+                    roast = roast,
                     onAction = {
                         if (isWaiting) SessionEngine(this).acknowledgeBreak()
                         else SessionEngine(this).dismissCurrentSound()
@@ -64,7 +72,7 @@ class AlarmActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AlarmScreen(isBreakDue: Boolean, onAction: () -> Unit) {
+private fun AlarmScreen(isBreakDue: Boolean, roast: String, onAction: () -> Unit) {
     BackHandler(enabled = isBreakDue) { }
     val ink = Color(0xFF171713)
     val paper = Color(0xFFF5F2E8)
@@ -88,7 +96,7 @@ private fun AlarmScreen(isBreakDue: Boolean, onAction: () -> Unit) {
             )
             Spacer(Modifier.height(20.dp))
             Text(
-                text = if (isBreakDue) "Work can wait.\nYour break starts now." else "Your next work\nblock has started.",
+                text = if (isBreakDue) roast else "Your next work\nblock has started.",
                 color = paper,
                 fontSize = 42.sp,
                 lineHeight = 47.sp,
@@ -106,7 +114,7 @@ private fun AlarmScreen(isBreakDue: Boolean, onAction: () -> Unit) {
                 ),
             ) {
                 Text(
-                    if (isBreakDue) "I'M ON BREAK" else "BACK TO WORK",
+                    if (isBreakDue) "I'M STEPPING AWAY" else "BACK TO WORK",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
                 )
@@ -114,7 +122,7 @@ private fun AlarmScreen(isBreakDue: Boolean, onAction: () -> Unit) {
             if (isBreakDue) {
                 Spacer(Modifier.height(18.dp))
                 Text(
-                    "The alarm will repeat every minute until you tap the button.",
+                    "Alarm repeats each minute. Tapping starts the timer; leaving the keyboard is the break.",
                     color = paper.copy(alpha = 0.72f),
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp,

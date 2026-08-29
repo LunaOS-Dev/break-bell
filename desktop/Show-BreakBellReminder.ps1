@@ -73,7 +73,7 @@ $xaml = @'
                 <TextBlock x:Name="Headline" Text="Step away now."
                            Foreground="#F7F4EA" FontFamily="Segoe UI Semibold"
                            FontSize="38" TextWrapping="Wrap" />
-                <TextBlock x:Name="Message" Text="Acknowledge on your phone, then leave the keyboard."
+                <TextBlock x:Name="Message" Text="Button acknowledgement is not break evidence."
                            Margin="0,10,0,0" Foreground="#C8CEC9" FontFamily="Segoe UI"
                            FontSize="17" TextWrapping="Wrap" />
             </StackPanel>
@@ -110,6 +110,8 @@ $countdown = $window.FindName('Countdown')
 $script:allowClose = $false
 $script:isExpanded = $false
 $script:wasHumanPresent = $false
+$script:hasVerifiedAway = $false
+$script:roastIndex = 0
 $script:lastExpandedAt = [DateTime]::MinValue
 $script:previewStartedAt = [DateTimeOffset]::Now
 
@@ -188,6 +190,41 @@ function Stop-Reminder {
     $window.Close()
 }
 
+function Get-NextRoast([string]$Situation) {
+    $breakDue = @(
+        'Your agents unanimously rejected the claim that one more thing will take five minutes.',
+        'Keyboard attachment duration exceeds the validated operating range.',
+        'Productivity remains acceptable. Operator condition is increasingly questionable.',
+        'Please perform scheduled human maintenance. This is not an approval request.',
+        'You have been identified as a single point of failure. Preventive maintenance is mandatory.',
+        'Operator appears to believe spinal discs are a consumable resource.'
+    )
+    $claimedButPresent = @(
+        'Break status is self-reported. Keyboard separation has not been observed.',
+        'Acknowledgement received. Actual human maintenance remains to be demonstrated.',
+        'The timer is resting beautifully. The operator appears to have missed the assignment.',
+        'Please detach from the keyboard and let the carbon-based cooling system idle.',
+        'Remaining at the computer is not an innovative interpretation of touching grass.',
+        'Keyboard activity remains elevated. Unfortunately, so does our concern.'
+    )
+    $returnedEarly = @(
+        'Human maintenance began successfully and has now been interrupted by the human.',
+        'Welcome back. The break timer has reviewed your early return and declined it.',
+        'Preventive maintenance was in progress. Please stop creating a recurrence event.',
+        'The keyboard survived your absence. It can survive a little longer.',
+        'You returned before the timer. This is not the initiative we needed.'
+    )
+
+    $messages = switch ($Situation) {
+        'RETURNED_EARLY' { $returnedEarly; break }
+        'BREAK_CLAIMED_ACTIVE' { $claimedButPresent; break }
+        default { $breakDue }
+    }
+    $message = $messages[$script:roastIndex % $messages.Count]
+    $script:roastIndex++
+    return $message
+}
+
 $window.Add_Closing({
     param($sender, $eventArgs)
     if (-not $script:allowClose) {
@@ -233,6 +270,7 @@ $timer.Add_Tick({
     $humanPresent = $idleSeconds -ge 0 -and $idleSeconds -lt 90
 
     if (-not $humanPresent) {
+        if ($status.phase -eq 'BREAK') { $script:hasVerifiedAway = $true }
         if ($window.IsVisible) { $window.Hide() }
         $script:wasHumanPresent = $false
         return
@@ -243,22 +281,33 @@ $timer.Add_Tick({
     $breakMinutes = [int]$status.currentBlock.breakMinutes
     $blockLabel.Text = ("{0} · {1} / {2}" -f $name.ToUpperInvariant(), $workMinutes, $breakMinutes)
 
-    if ($status.phase -eq 'WAITING_FOR_BREAK') {
-        $headline.Text = 'Step away now.'
-        $message.Text = "Acknowledge on your phone, then take the $breakMinutes-minute break."
+    $situation = if ($status.phase -eq 'WAITING_FOR_BREAK') {
+        'BREAK_DUE_ACTIVE'
+    } elseif ($script:hasVerifiedAway) {
+        'RETURNED_EARLY'
+    } else {
+        'BREAK_CLAIMED_ACTIVE'
+    }
+
+    if ($situation -eq 'BREAK_DUE_ACTIVE') {
+        $headline.Text = 'Break request still open.'
         $countdown.Text = 'ACKNOWLEDGE'
     } else {
         $remaining = [math]::Max(0, [math]::Ceiling(([long]$status.phaseEndsAt - $nowMs) / 1000))
         $minutes = [math]::Floor($remaining / 60)
         $seconds = $remaining % 60
-        $headline.Text = 'Break in progress.'
-        $message.Text = 'The agents are working. You are currently assigned to touching grass.'
+        $headline.Text = if ($situation -eq 'RETURNED_EARLY') {
+            'Welcome back. Too early.'
+        } else {
+            'Break claimed. Presence detected.'
+        }
         $countdown.Text = ('{0:00}:{1:00}' -f $minutes, $seconds)
     }
 
     $shouldExpand = -not $script:wasHumanPresent -or
                     ([DateTime]::Now - $script:lastExpandedAt).TotalSeconds -ge 60
     if ($shouldExpand) {
+        $message.Text = Get-NextRoast $situation
         Show-Reminder $true
     } elseif ($script:isExpanded -and ([DateTime]::Now - $script:lastExpandedAt).TotalSeconds -ge 10) {
         Show-Reminder $false

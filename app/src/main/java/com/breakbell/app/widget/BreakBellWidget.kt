@@ -79,7 +79,7 @@ class BreakBellWidget : AppWidgetProvider() {
             Phase.IDLE -> "BREAK BELL"
             Phase.WORK -> "FOCUSING"
             Phase.WAITING_FOR_BREAK -> "BREAK OVERDUE"
-            Phase.BREAK -> "ON BREAK"
+            Phase.BREAK -> "BREAK TIMER"
         }
     }
 }

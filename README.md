@@ -4,19 +4,22 @@ Break Bell is a native Android workday timer that does not politely disappear wh
 
 **AI can keep producing indefinitely. Humans cannot.** Break Bell lets the agents continue while enforcing the one dependency the workflow cannot replace: required human maintenance.
 
+**A break enforcer for people who ignore break reminders. You will be affectionately bullied into touching grass.** The bell gets attention; a fresh, context-aware roast changes mental state.
+
 ## What the first release does
 
 - Starts and ends the workday from the app or a home-screen widget.
-- Records local start time, stop time, elapsed time, and completed breaks.
+- Records local start time, stop time, elapsed time, and completed break timers. Actual computer disengagement is classified separately by the optional desktop bridge.
 - Includes Quick (25/5), Deep (45/10), and Long (60/10) presets.
 - Supports one repeating block or an ordered pattern of preset and custom blocks.
 - Locks the selected pattern during an active workday.
-- Rings for 10 seconds every minute after a work block until **I'm on break** is acknowledged.
+- Rings for 10 seconds every minute after a work block until **I'm stepping away** is acknowledged.
 - Starts the break countdown only after acknowledgment.
 - Starts the next work block automatically when the break ends.
 - Restores exact alarms after reboot, clock changes, or timezone changes.
-- Optionally publishes timer phase to a paired desktop bridge so agents can remind an active human to take the scheduled break.
-- Shows a staged Windows reminder during breaks: prominent for 10 seconds, quietly docked afterward, and prominent again once per minute only while the human is still using the computer.
+- Optionally publishes timer phase to a paired desktop bridge so agents can distinguish a promised break from verified keyboard separation.
+- Classifies local break evidence as overdue-and-active, claimed-but-active, or verified-away using Windows idle duration.
+- Shows a staged Windows reminder with rotating, situation-aware roasts: prominent for 10 seconds, quietly docked afterward, and prominent again once per minute only while the human is still using the computer.
 
 ## Android requirements
 
@@ -52,13 +55,19 @@ The bridge requires Node.js 20 or newer on the Windows computer.
 
 The installer creates a current-user scheduled task named `Break Bell Agent Bridge`. It is provided but is not run automatically by this repository.
 
-The phone sends only timer state: current phase, block lengths, timestamps, and completed-break count. The agent helper and desktop reminder ask Windows only how many seconds have elapsed since the last keyboard or mouse input. The reminder disappears when the human has been away for 90 seconds, returns if they resume computer use during the break, and closes when the break ends. It does not capture keys, screen contents, application names, camera, or microphone data.
+The phone sends only timer state: current phase, block lengths, timestamps, and completed-break count. The agent helper and desktop reminder ask Windows only how many seconds have elapsed since the last keyboard or mouse input. A tap starts the phone's break timer; it does not count as proof that the user left. The desktop considers 90 seconds without input verified keyboard separation. The reminder disappears at that point, roasts an early return, and closes when the break ends. It does not capture keys, screen contents, application names, processes, camera, or microphone data.
 
 The local bridge uses token-authenticated HTTP on the LAN. The payload is low-sensitivity timer metadata but is not encrypted in transit; use it only on a trusted local network.
 
 ## Agent behavior
 
-The workspace `break-enforcer` skill checks the paired status before substantive work. When the phone says a break is active and Windows reports input within the last 90 seconds, the agent keeps working but leads its next progress update with one firm, playful human-maintenance reminder. It never treats a reminder as proof that the break happened.
+The repository's `.agents/skills/break-enforcer` skill checks paired timer state against current Windows idle time before substantive work. It reports explicit engagement states, so `BREAK_CLAIMED_ACTIVE` cannot masquerade as `BREAK_VERIFIED_AWAY`. When a break is due and Windows reports input within the last 90 seconds, the agent keeps working but leads its next progress update with a fresh, evidence-based, affectionate roast. Agents vary the wording and intensity with the live situation; they never treat a user statement or button tap as proof that the break happened.
+
+Run the deterministic desktop policy checks with:
+
+```powershell
+.\desktop\Test-BreakBellStatus.ps1
+```
 
 ## Privacy and license
 
