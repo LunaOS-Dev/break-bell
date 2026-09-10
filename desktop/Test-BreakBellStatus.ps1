@@ -32,6 +32,14 @@ function Assert-Equal($Expected, $Actual, [string]$Message) {
 try {
     New-Item -ItemType Directory -Path $testDirectory | Out-Null
 
+    # The optional transition stays WORK and must not add agent reminders.
+    Write-TestStatus 'WORK' ($now - 1380000) ($now + 120000)
+    $headsUp = Read-TestStatus 0
+    Assert-Equal 'WORKING' $headsUp.engagementState 'Heads-up time remains work.'
+    Assert-Equal $false $headsUp.shouldRemind 'Heads-up time must not add agent reminders.'
+    Assert-Equal $false $headsUp.verifiedAway 'A transition aid must not verify a break.'
+    Assert-Equal 0 $headsUp.reminderSequence 'Work must not start reminder sequencing.'
+
     Write-TestStatus 'WAITING_FOR_BREAK' ($now - 125000) 0
     $due = Read-TestStatus 0
     Assert-Equal 'BREAK_DUE_ACTIVE' $due.engagementState 'Due-break activity was misclassified.'
@@ -52,6 +60,16 @@ try {
     $unknown = Read-TestStatus -1
     Assert-Equal 'ACTIVITY_UNAVAILABLE' $unknown.engagementState 'Missing activity evidence must remain unknown.'
     Assert-Equal $false $unknown.verifiedAway 'Missing activity evidence must not verify a break.'
+
+    $threshold = Read-TestStatus 89
+    Assert-Equal $false $threshold.verifiedAway 'The away threshold must remain enforced.'
+    $threshold = Read-TestStatus 90
+    Assert-Equal $true $threshold.verifiedAway 'The existing 90-second away threshold must remain intact.'
+
+    Write-TestStatus 'WORK' $now ($now + 2700000)
+    $resumed = Read-TestStatus 0
+    Assert-Equal $false $resumed.shouldRemind 'Resuming work must stop agent reminders.'
+    Assert-Equal $false $resumed.verifiedAway 'Resuming work is not evidence of disengagement.'
 
     Write-Output 'Break Bell desktop status tests passed.'
 } finally {

@@ -13,6 +13,8 @@ Break Bell is a native Android workday timer that does not politely disappear wh
 - Includes Quick (25/5), Deep (45/10), and Long (60/10) presets.
 - Supports one repeating block or an ordered pattern of preset and custom blocks.
 - Locks the selected pattern during an active workday.
+- Gives one silent heads-up two minutes before a break. For work blocks under ten minutes, the lead is one fifth of the block (five minutes: one minute; one minute: twelve seconds).
+- Offers an optional **Next, I’m going to ___** bookmark during the heads-up, saved locally as you type. It appears on the next work block and break-complete screen.
 - Rings for 10 seconds every minute after a work block until **I'm stepping away** is acknowledged.
 - Starts the break countdown only after acknowledgment.
 - Starts the next work block automatically when the break ends.
@@ -43,6 +45,16 @@ $env:ANDROID_HOME = 'path-to-android-sdk'
 ```
 
 The debug APK is written to `app\build\outputs\apk\debug\app-debug.apk`.
+
+## Quiet transitions
+
+The heads-up appears in the app and as a silent notification that opens the optional bookmark. It has no sound, vibration, full-screen interruption, or repeat. The work-end alarm remains independently scheduled. A late heads-up is skipped once the break is due.
+
+Bookmarks are optional, limited to 500 characters, and saved on each edit without a submit button. At the deadline the editor closes; empty or unfinished notes never delay acknowledgment or the break countdown. Notes survive app recreation and reboot, move to the next work block after the break, and clear when the day ends. A later blank bookmark does not reuse an older note. Bookmarks stay on the phone and are not sent to the desktop bridge or agents.
+
+The acknowledgment, mandatory break duration, no-snooze break alarm, and Windows inactivity checks retain their existing behavior. The heads-up does not create a new agent-reminder phase.
+
+Transition boundary, persistence, notification, and enforcement regression tests run with `testDebugUnitTest`; Android integration tests use Robolectric. Run `lintDebug assembleDebug` for static checks and APK generation. Device testing is still needed to assess notification delivery under device-specific power management.
 
 ## Pair the optional agent bridge
 

@@ -12,6 +12,9 @@ object TimerTransitions {
             pattern = pattern,
             currentBlockIndex = 0,
             completedBreaks = 0,
+            headsUpShown = false,
+            pendingBookmark = "",
+            resumeBookmark = "",
         )
     }
 
@@ -37,6 +40,9 @@ object TimerTransitions {
             pattern = pattern,
             currentBlockIndex = nextIndex,
             completedBreaks = current.completedBreaks + 1,
+            headsUpShown = false,
+            resumeBookmark = current.pendingBookmark.trim(),
+            pendingBookmark = "",
         )
     }
 
