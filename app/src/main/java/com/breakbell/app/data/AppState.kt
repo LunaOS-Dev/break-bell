@@ -16,6 +16,9 @@ data class AppState(
     val pattern: List<BlockPlan> = listOf(BlockPlan.Quick),
     val currentBlockIndex: Int = 0,
     val completedBreaks: Int = 0,
+    val headsUpShown: Boolean = false,
+    val pendingBookmark: String = "",
+    val resumeBookmark: String = "",
 ) {
     val currentBlock: BlockPlan
         get() = pattern.getOrElse(currentBlockIndex) { BlockPlan.Quick }

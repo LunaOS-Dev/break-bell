@@ -9,12 +9,14 @@ import com.breakbell.app.data.BreakBellStore
 import com.breakbell.app.data.Phase
 import com.breakbell.app.data.TimerTransitions
 import com.breakbell.app.data.WorkdayRecord
+import com.breakbell.app.data.WorkTransition
 import com.breakbell.app.widget.BreakBellWidget
 
 class SessionEngine(context: Context) {
     private val appContext = context.applicationContext
     private val store = BreakBellStore(appContext)
     private val scheduler = AlarmScheduler(appContext)
+    private val transitionNotification = TransitionNotification(appContext)
 
     fun startWorkday(now: Long = System.currentTimeMillis()): Boolean {
         val current = store.readState()
@@ -25,6 +27,7 @@ class SessionEngine(context: Context) {
         store.writeState(state)
         return runCatching {
             scheduler.schedule(AlarmKind.WORK_END, state.phaseEndsAt)
+            scheduleHeadsUp(state, now)
             BreakBellWidget.refreshAll(appContext)
             AgentBridge.publish(appContext, state)
             true
@@ -41,6 +44,7 @@ class SessionEngine(context: Context) {
             store.addRecord(WorkdayRecord(current.workdayStartedAt, now, current.completedBreaks))
         }
         scheduler.cancelAll()
+        runCatching { transitionNotification.cancel() }
         stopSound()
         val idle = current.copy(
                 isActive = false,
@@ -50,6 +54,9 @@ class SessionEngine(context: Context) {
                 phaseEndsAt = 0L,
                 currentBlockIndex = 0,
                 completedBreaks = 0,
+                headsUpShown = false,
+                pendingBookmark = "",
+                resumeBookmark = "",
             )
         store.writeState(idle)
         BreakBellWidget.refreshAll(appContext)
@@ -75,11 +82,21 @@ class SessionEngine(context: Context) {
         if (!current.isActive) return
 
         when (kind) {
+            AlarmKind.WORK_HEADS_UP -> {
+                if (!WorkTransition.isHeadsUp(current, now) || current.headsUpShown) return
+                store.writeState(current.copy(headsUpShown = true))
+                runCatching { transitionNotification.show(current, now) }
+                // No sound, phase change, bridge publication, or repeating reminder.
+                return
+            }
+
             AlarmKind.WORK_END -> {
                 if (current.phase != Phase.WORK) return
                 val waiting = TimerTransitions.markBreakDue(current, now)
                 store.writeState(waiting)
                 scheduler.schedule(AlarmKind.BREAK_NAG, now + NAG_INTERVAL_MILLIS)
+                scheduler.cancel(AlarmKind.WORK_HEADS_UP)
+                runCatching { transitionNotification.cancel() }
                 runCatching { startSound(AlarmSoundService.ALERT_BREAK_DUE) }
             }
 
@@ -94,6 +111,7 @@ class SessionEngine(context: Context) {
                 val working = TimerTransitions.beginNextWorkBlock(current, now)
                 store.writeState(working)
                 scheduler.schedule(AlarmKind.WORK_END, working.phaseEndsAt)
+                scheduleHeadsUp(working, now)
                 runCatching { startSound(AlarmSoundService.ALERT_BREAK_COMPLETE) }
             }
         }
@@ -104,6 +122,7 @@ class SessionEngine(context: Context) {
     fun rescheduleAfterSystemChange(now: Long = System.currentTimeMillis()) {
         val state = store.readState()
         scheduler.cancelAll()
+        runCatching { transitionNotification.cancel() }
         if (!state.isActive || !scheduler.canScheduleExactAlarms()) return
 
         when (state.phase) {
@@ -111,6 +130,7 @@ class SessionEngine(context: Context) {
                 onAlarm(AlarmKind.WORK_END, now)
             } else {
                 scheduler.schedule(AlarmKind.WORK_END, state.phaseEndsAt)
+                scheduleHeadsUp(state, now)
             }
 
             Phase.BREAK -> if (state.phaseEndsAt <= now) {
@@ -133,6 +153,18 @@ class SessionEngine(context: Context) {
                 .setAction(AlarmSoundService.ACTION_START)
                 .putExtra(AlarmSoundService.EXTRA_ALERT_TYPE, alertType),
         )
+    }
+
+    private fun scheduleHeadsUp(state: AppState, now: Long) {
+        // Enforcement is scheduled first; this optional aid cannot prevent it being armed.
+        runCatching {
+            if (state.headsUpShown) return@runCatching
+            if (WorkTransition.isHeadsUp(state, now)) {
+                onAlarm(AlarmKind.WORK_HEADS_UP, now)
+            } else if (now < WorkTransition.headsUpAt(state)) {
+                scheduler.schedule(AlarmKind.WORK_HEADS_UP, WorkTransition.headsUpAt(state))
+            }
+        }
     }
 
     private fun stopSound() {

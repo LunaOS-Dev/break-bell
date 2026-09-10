@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,6 +50,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -87,6 +90,7 @@ import com.breakbell.app.data.BreakRoasts
 import com.breakbell.app.data.BridgeConfig
 import com.breakbell.app.data.Phase
 import com.breakbell.app.data.WorkdayRecord
+import com.breakbell.app.data.WorkTransition
 import com.breakbell.app.ui.theme.BreakBellTheme
 import com.breakbell.app.ui.theme.Ink
 import com.breakbell.app.ui.theme.Muted
@@ -168,6 +172,10 @@ private fun BreakBellApp() {
                 now = now,
                 onAcknowledge = { engine.acknowledgeBreak() },
                 onEnd = { engine.endWorkday() },
+                onBookmarkChanged = { text ->
+                    store.updateBookmark(text, state.workdayStartedAt, state.phaseStartedAt, System.currentTimeMillis())
+                    state = store.readState()
+                },
             )
         } else {
             SetupWorkday(
@@ -353,13 +361,19 @@ private fun SetupWorkday(
 }
 
 @Composable
-private fun ActiveWorkday(
+internal fun ActiveWorkday(
     state: AppState,
     now: Long,
     onAcknowledge: () -> Unit,
     onEnd: () -> Unit,
+    onBookmarkChanged: (String) -> Unit,
 ) {
     val contentColor = Paper
+    val headsUp = WorkTransition.isHeadsUp(state, now)
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(headsUp) {
+        if (!headsUp) focusManager.clearFocus(force = true)
+    }
     val remaining = max(0L, state.phaseEndsAt - now)
     val total = when (state.phase) {
         Phase.WORK -> state.currentBlock.workMinutes * 60_000L
@@ -371,6 +385,8 @@ private fun ActiveWorkday(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(24.dp),
@@ -387,7 +403,7 @@ private fun ActiveWorkday(
             }
         }
 
-        Spacer(Modifier.weight(0.55f))
+        Spacer(Modifier.height(24.dp))
         AnimatedContent(
             targetState = state.phase,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -413,6 +429,31 @@ private fun ActiveWorkday(
             color = contentColor,
         )
         Spacer(Modifier.height(28.dp))
+
+        if (headsUp) {
+            Text(WorkTransition.message(state, now), color = contentColor, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = state.pendingBookmark,
+                onValueChange = onBookmarkChanged,
+                label = { Text("Next, I’m going to ___") },
+                supportingText = { Text("Optional · saved automatically") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 1,
+                maxLines = 3,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Paper, unfocusedTextColor = Paper,
+                    cursorColor = Paper, focusedBorderColor = Paper,
+                    unfocusedBorderColor = Paper.copy(alpha = .6f),
+                    focusedLabelColor = Paper, unfocusedLabelColor = Paper,
+                    focusedSupportingTextColor = Paper, unfocusedSupportingTextColor = Paper,
+                ),
+            )
+            Spacer(Modifier.height(16.dp))
+        } else if (state.phase == Phase.WORK && state.resumeBookmark.isNotBlank()) {
+            Text("Next, I’m going to ${state.resumeBookmark}", color = contentColor, fontSize = 18.sp)
+            Spacer(Modifier.height(16.dp))
+        }
 
         if (state.phase == Phase.WAITING_FOR_BREAK) {
             Button(
@@ -447,7 +488,7 @@ private fun ActiveWorkday(
             )
         }
 
-        Spacer(Modifier.weight(0.7f))
+        Spacer(Modifier.height(32.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

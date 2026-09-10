@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +62,7 @@ class AlarmActivity : ComponentActivity() {
                 AlarmScreen(
                     isBreakDue = isWaiting,
                     roast = roast,
+                    bookmark = if (state.phase == Phase.WORK) state.resumeBookmark else "",
                     onAction = {
                         if (isWaiting) SessionEngine(this).acknowledgeBreak()
                         else SessionEngine(this).dismissCurrentSound()
@@ -72,7 +75,7 @@ class AlarmActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AlarmScreen(isBreakDue: Boolean, roast: String, onAction: () -> Unit) {
+internal fun AlarmScreen(isBreakDue: Boolean, roast: String, bookmark: String, onAction: () -> Unit) {
     BackHandler(enabled = isBreakDue) { }
     val ink = Color(0xFF171713)
     val paper = Color(0xFFF5F2E8)
@@ -83,7 +86,7 @@ private fun AlarmScreen(isBreakDue: Boolean, roast: String, onAction: () -> Unit
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -104,6 +107,11 @@ private fun AlarmScreen(isBreakDue: Boolean, roast: String, onAction: () -> Unit
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(52.dp))
+            if (!isBreakDue && bookmark.isNotBlank()) {
+                Text("Next, I’m going to $bookmark", color = paper, fontSize = 20.sp,
+                    textAlign = TextAlign.Center)
+                Spacer(Modifier.height(24.dp))
+            }
             Button(
                 onClick = onAction,
                 modifier = Modifier.fillMaxWidth().height(64.dp),

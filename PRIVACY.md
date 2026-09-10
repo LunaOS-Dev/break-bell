@@ -6,7 +6,7 @@ Break Bell is designed to keep workday timer data under the user's control.
 
 ## Data stored on the Android device
 
-Break Bell stores timer preferences, the current timer state, and workday history locally on the device. The app does not include advertising, analytics, user accounts, or a cloud service operated by the maintainers.
+Break Bell stores timer preferences, the current timer state, workday history, and an optional next-step bookmark locally on the device. The bookmark stays on the phone, appears when work resumes, and is cleared when the workday ends. It is not included in desktop bridge messages. The app does not include advertising, analytics, user accounts, or a cloud service operated by the maintainers.
 
 ## Optional desktop bridge
 

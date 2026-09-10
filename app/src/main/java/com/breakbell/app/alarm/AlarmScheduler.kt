@@ -27,6 +27,10 @@ class AlarmScheduler(private val context: Context) {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        if (kind == AlarmKind.WORK_HEADS_UP) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation)
+            return
+        }
         alarmManager.setAlarmClock(
             AlarmManager.AlarmClockInfo(triggerAtMillis, showApp),
             operation,

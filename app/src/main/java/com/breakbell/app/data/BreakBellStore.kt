@@ -19,6 +19,9 @@ class BreakBellStore(context: Context) {
             pattern = readPattern(),
             currentBlockIndex = preferences.getInt(KEY_CURRENT_BLOCK_INDEX, 0).coerceAtLeast(0),
             completedBreaks = preferences.getInt(KEY_COMPLETED_BREAKS, 0).coerceAtLeast(0),
+            headsUpShown = preferences.getBoolean(KEY_HEADS_UP_SHOWN, false),
+            pendingBookmark = preferences.getString(KEY_PENDING_BOOKMARK, "") ?: "",
+            resumeBookmark = preferences.getString(KEY_RESUME_BOOKMARK, "") ?: "",
         )
     }
 
@@ -32,7 +35,22 @@ class BreakBellStore(context: Context) {
             .putString(KEY_PATTERN, encodePattern(state.pattern))
             .putInt(KEY_CURRENT_BLOCK_INDEX, state.currentBlockIndex)
             .putInt(KEY_COMPLETED_BREAKS, state.completedBreaks)
+            .putBoolean(KEY_HEADS_UP_SHOWN, state.headsUpShown)
+            .putString(KEY_PENDING_BOOKMARK, state.pendingBookmark)
+            .putString(KEY_RESUME_BOOKMARK, state.resumeBookmark)
             .apply()
+    }
+
+    // Write only the note, never a UI snapshot of the timer. Late input cannot undo a break.
+    fun updateBookmark(text: String, workdayStartedAt: Long, phaseStartedAt: Long, now: Long): Boolean {
+        val current = readState()
+        if (!WorkTransition.isHeadsUp(current, now) ||
+            current.workdayStartedAt != workdayStartedAt || current.phaseStartedAt != phaseStartedAt
+        ) return false
+        preferences.edit()
+            .putString(KEY_PENDING_BOOKMARK, text.take(WorkTransition.MAX_BOOKMARK_LENGTH))
+            .apply()
+        return true
     }
 
     fun updatePattern(pattern: List<BlockPlan>) {
@@ -106,6 +124,9 @@ class BreakBellStore(context: Context) {
         const val KEY_PATTERN = "pattern"
         const val KEY_CURRENT_BLOCK_INDEX = "current_block_index"
         const val KEY_COMPLETED_BREAKS = "completed_breaks"
+        const val KEY_HEADS_UP_SHOWN = "heads_up_shown"
+        const val KEY_PENDING_BOOKMARK = "pending_bookmark"
+        const val KEY_RESUME_BOOKMARK = "resume_bookmark"
         const val KEY_HISTORY = "history"
         const val KEY_BRIDGE_ADDRESS = "bridge_address"
         const val KEY_BRIDGE_TOKEN = "bridge_token"
